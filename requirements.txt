@@ -1,7 +1,3 @@
 flask
 twilio
 python-dotenv
-gspread
-oauth2client
-apscheduler
-requests
