@@ -1,48 +1,62 @@
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
+import os
+import json
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from dotenv import load_dotenv
-import os
 
-# === LOAD ENV ===
-load_dotenv()
-
-# === FLASK APP ===
 app = Flask(__name__)
 
-# === GOOGLE SHEETS ===
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name("creds.json", scope)
-client = gspread.authorize(creds)
-sheet = client.open("RestaurantBookings").sheet1
+# Load Google Sheet only when first message comes (no creds.json file needed)
+sheet = None
+def get_sheet():
+    global sheet
+    if sheet is None:
+        try:
+            creds_json = os.getenv("GOOGLE_CREDS_JSON")
+            if not creds_json:
+                print("No Google creds in env - running without sheet")
+                return None
+            creds_dict = json.loads(creds_json)
+            creds = ServiceAccountCredentials.from_json_keyfile_dict(
+                creds_dict,
+                ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+            )
+            client = gspread.authorize(creds)
+            sheet = client.open("RestaurantBookings").sheet1
+            print("Google Sheet connected!")
+        except Exception as e:
+            print("Sheet error:", e)
+            sheet = None
+    return sheet
 
-# === WHATSAPP ROUTE (BYPASS MODE) ===
 @app.route("/whatsapp", methods=["POST"])
 def whatsapp_reply():
-    from_number = request.values.get("From", "unknown")
+    from_number = request.values.get("From")
     resp = MessagingResponse()
     msg = resp.message()
 
-    # === HARDCODED BOOKING ===
-    name = "Priyanka"
-    people = "4"
-    time = "8 PM"
-    date = "tomorrow"
+    # Hardcoded test booking
+    booking = {
+        "name": "Priyanka",
+        "people": "4",
+        "time": "8 PM",
+        "date": "tomorrow"
+    }
 
-    # === ADD TO SHEET ===
-    try:
-        sheet.append_row([name, people, time, date, from_number, "PENDING"])
-        print("ROW ADDED TO SHEET!")
-    except Exception as e:
-        print("SHEET ERROR:", e)
+    # Try to save to Google Sheet
+    sh = get_sheet()
+    if sh:
+        try:
+            sh.append_row([booking["name"], booking["people"], booking["time"], booking["date"], from_number, "PENDING"])
+            print("Row added to sheet")
+        except Exception as e:
+            print("Failed to write to sheet:", e)
 
-    # === SEND REPLY ===
-    reply = f"नमस्ते {name} जी!\n{people} लोग, {time} के लिए बुकिंग हो गई।\nकन्फर्म: *1*, कैंसिल: *2*"
+    reply = f"नमस्ते {booking['name']} जी!\n{booking['people']} लोग, {booking['time']} के लिए बुकिंग हो गई।\nकन्फर्म: *1*, कैंसिल: *2*"
     msg.body(reply)
-
     return str(resp)
 
-# === RUN SERVER ===
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    port = int(os.getenv("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
