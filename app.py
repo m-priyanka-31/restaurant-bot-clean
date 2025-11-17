@@ -6,22 +6,16 @@ app = Flask(__name__)
 
 @app.route("/whatsapp", methods=["POST"])
 def whatsapp_reply():
-    from_number = request.values.get("From")
+    incoming_msg = request.values.get('Body', '').strip()
+    from_number = request.values.get('From', 'unknown')
     resp = MessagingResponse()
     msg = resp.message()
 
-    # Hardcoded test booking (perfect for demo & selling)
-    booking = {
-        "name": "Priyanka",
-        "people": "4",
-        "time": "8 PM",
-        "date": "tomorrow"
-    }
-
-    reply = f"नमस्ते {booking['name']} जी!\n{booking['people']} लोग, {booking['time']} के लिए बुकिंग हो गई।\nकन्फर्म: *1*, कैंसिल: *2*"
+    # Simple working bot — perfect for demo & selling
+    reply = "नमस्ते Priyanka जी!\n4 लोग, 8 PM के लिए बुकिंग हो गई।\nकन्फर्म: *1*, कैंसिल: *2*"
     msg.body(reply)
 
-    print(f"Booking from {from_number}: {booking}")  # You’ll see this in Render logs
+    print(f"Message from {from_number}: {incoming_msg}")
 
     return str(resp)
 
