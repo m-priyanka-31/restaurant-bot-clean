@@ -2,31 +2,8 @@ from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
 import os
 import re
-import json
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
 
 app = Flask(__name__)
-
-# Lazy load Sheet
-sheet = None
-def get_sheet():
-    global sheet
-    if sheet is None:
-        try:
-            creds_json = os.getenv("GOOGLE_CREDS_JSON")
-            if not creds_json:
-                return None
-            creds_dict = json.loads(creds_json)
-            scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-            creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-            client = gspread.authorize(creds)
-            sheet = client.open("RestaurantBookings").sheet1  # Exact file name
-            print("Sheet connected!")
-        except Exception as e:
-            print(f"Sheet error: {e}")
-            sheet = None
-    return sheet
 
 def extract_booking(text):
     text = text.lower() + " "
@@ -40,7 +17,6 @@ def extract_booking(text):
 @app.route("/whatsapp", methods=["POST"])
 def whatsapp_reply():
     incoming = request.values.get('Body', '').strip()
-    from_number = request.values.get('From', 'unknown')
     resp = MessagingResponse()
     msg = resp.message()
 
@@ -48,16 +24,6 @@ def whatsapp_reply():
 
     reply = f"<p>नमस्ते!</p><p>{booking['people']} लोग, {booking['time']} के लिए बुकिंग हो गई।</p><p>कन्फर्म: *1* | कैंसिल: *2*</p>"
     msg.body(reply)
-
-    # Save to Sheet
-    sh = get_sheet()
-    if sh:
-        try:
-            phone = from_number.split(':')[1] if ':' in from_number else "unknown"
-            sh.append_row([booking["people"], booking["time"], "", phone, "PENDING"])
-            print("Row added!")
-        except Exception as e:
-            print(f"Row error: {e}")
 
     return str(resp)
 
