@@ -8,24 +8,24 @@ from oauth2client.service_account import ServiceAccountCredentials
 
 app = Flask(__name__)
 
-# Lazy Google Sheet – only loads when needed
+# Lazy load Sheet — no startup crash
 sheet = None
 def get_sheet():
     global sheet
     if sheet is None:
-        creds_json = os.getenv("GOOGLE_CREDS_JSON")
-        if not creds_json:
-            print("No GOOGLE_CREDS_JSON → Sheet disabled")
-            return None
         try:
+            creds_json = os.getenv("GOOGLE_CREDS_JSON")
+            if not creds_json:
+                print("No GOOGLE_CREDS_JSON — skipping Sheet")
+                return None
             creds_dict = json.loads(creds_json)
             scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
             creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
             client = gspread.authorize(creds)
-            sheet = client.open("RestaurantBookings").sheet1   # ← change name if yours is different
-            print("Google Sheet connected successfully!")
+            sheet = client.open("RestaurantBookings").sheet1
+            print("Sheet loaded!")
         except Exception as e:
-            print("Sheet connection failed:", e)
+            print(f"Sheet error: {e}")
             sheet = None
     return sheet
 
@@ -47,21 +47,21 @@ def whatsapp_reply():
 
     booking = extract_booking(incoming)
 
-    reply = f"<p>नमस्ते!</p>" \
-            f"<p>{booking['people']} लोग, {booking['time']} के लिए बुकिंग हो गई।</p>" \
-            f"<p>कन्फर्म → <b>1</b>   |   कैंसिल → <b>2</b></p>"
+    # Formatted reply with line breaks
+    reply = f"<p>नमस्ते!</p><p>{booking['people']} लोग, {booking['time']} के लिए बुकिंग हो गई।</p><p>कन्फर्म: *1* | कैंसिल: *2*</p>"
     msg.body(reply)
 
-    # Save to Google Sheet if available
+    # Save to Sheet if available
     sh = get_sheet()
     if sh:
         try:
             sh.append_row([booking["people"], booking["time"], "", from_number.split(':')[1], "PENDING"])
-            print("Row added to Google Sheet!")
+            print("Row added!")
         except Exception as e:
-            print("Failed to write row:", e)
+            print(f"Row error: {e}")
 
     return str(resp)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
+    port = int(os.getenv("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
