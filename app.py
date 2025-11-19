@@ -22,7 +22,7 @@ def get_sheet():
             scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
             creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
             gc = gspread.authorize(creds)
-            sheet = gc.open("RestaurantBookings").sheet1   # ← change name if yours is different
+            sheet = gc.open("RestaurantBookings").worksheet("Sheet1") # ← change name if yours is different
             print("Google Sheet connected!")
         except Exception as e:
             print("Sheet error:", e)
